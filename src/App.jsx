@@ -15,6 +15,9 @@ import {
   ArrowRight,
   AlertTriangle,
   Check,
+  Download,
+  Smartphone,
+  Share2,
 } from 'lucide-react';
 import {
   getTodayISO,
@@ -129,6 +132,92 @@ export default function App() {
 
   // Input ref to keep focus for fast typing
   const nameInputRef = useRef(null);
+
+  // PWA Device Installation States
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+  const [showIosModal, setShowIosModal] = useState(false);
+
+  // Detect PWA installability and listen for installation triggers
+  useEffect(() => {
+    // 1. Check if already running in installed standalone mode
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true ||
+      document.referrer.includes('android-app://');
+
+    if (isStandalone) {
+      setIsInstalled(true);
+      return;
+    }
+
+    // 2. Detect iOS Safari
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const isIosDevice = /iphone|ipad|ipod/.test(userAgent) && !window.MSStream;
+    setIsIos(isIosDevice);
+
+    // 3. Show install option when entering website (unless dismissed in this session)
+    const isDismissed = sessionStorage.getItem('feemanage_install_dismissed') === 'true';
+    if (!isDismissed) {
+      // Show immediately or after short gentle intro delay
+      const introTimer = setTimeout(() => {
+        setShowInstallBanner(true);
+      }, 700);
+
+      const handleBeforeInstall = (e) => {
+        e.preventDefault();
+        setDeferredPrompt(e);
+        setShowInstallBanner(true);
+      };
+
+      const handleAppInstalled = () => {
+        setIsInstalled(true);
+        setShowInstallBanner(false);
+        setDeferredPrompt(null);
+        setToastMessage('🎉 FeeManage app installed to your device successfully!');
+      };
+
+      window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.addEventListener('appinstalled', handleAppInstalled);
+
+      return () => {
+        clearTimeout(introTimer);
+        window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+        window.removeEventListener('appinstalled', handleAppInstalled);
+      };
+    }
+  }, []);
+
+  // Action: Trigger Device Install
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      try {
+        deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        if (choice.outcome === 'accepted') {
+          setIsInstalled(true);
+          setShowInstallBanner(false);
+          setToastMessage('🎉 Installing FeeManage to your device...');
+        }
+      } catch (err) {
+        console.error('Install prompt error:', err);
+      }
+      setDeferredPrompt(null);
+    } else if (isIos) {
+      setShowIosModal(true);
+    } else {
+      // Fallback instructions for browsers that already triggered or don't support beforeinstallprompt
+      setShowIosModal(true);
+    }
+  };
+
+  // Action: Dismiss Install Banner
+  const handleDismissInstall = () => {
+    setShowInstallBanner(false);
+    sessionStorage.setItem('feemanage_install_dismissed', 'true');
+  };
 
   // Save to local storage
   useEffect(() => {
@@ -387,6 +476,46 @@ export default function App() {
 
   return (
     <div className="app-container">
+      {/* PWA Device Install Banner (Displayed when user enters the website) */}
+      {showInstallBanner && !isInstalled && (
+        <aside className="install-app-banner" aria-label="Install App Prompt">
+          <div className="install-banner-left">
+            <div className="install-app-icon">
+              <img src="/icon.svg" alt="FeeManage Icon" width="38" height="38" />
+            </div>
+            <div className="install-banner-text">
+              <div className="install-banner-title">
+                <span>Install FeeManage on your device</span>
+                <span className="install-pill-tag">Offline App</span>
+              </div>
+              <p className="install-banner-desc">
+                Install to your phone or PC for 1-tap home screen access & instant fee tracking.
+              </p>
+            </div>
+          </div>
+          <div className="install-banner-actions">
+            <button
+              type="button"
+              className="btn-install-primary"
+              onClick={handleInstallClick}
+              title="Install FeeManage App"
+            >
+              <Download size={15} />
+              <span>Install App</span>
+            </button>
+            <button
+              type="button"
+              className="btn-install-dismiss"
+              onClick={handleDismissInstall}
+              title="Dismiss banner"
+              aria-label="Dismiss banner"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </aside>
+      )}
+
       {/* App Header */}
       <header className="app-header">
         <div className="brand-section">
@@ -434,6 +563,24 @@ export default function App() {
             <Calendar size={14} />
             <span>Today: {formatDisplayDate(getTodayISO())}</span>
           </div>
+
+          {/* Install Option in Header */}
+          {!isInstalled ? (
+            <button
+              type="button"
+              className="btn-header-install"
+              onClick={handleInstallClick}
+              title="Install FeeManage to your phone or desktop"
+            >
+              <Smartphone size={14} />
+              <span>Install App</span>
+            </button>
+          ) : (
+            <div className="app-installed-badge" title="Running in standalone app mode">
+              <CheckCircle2 size={13} color="#059669" />
+              <span>Installed</span>
+            </div>
+          )}
         </div>
       </header>
 
@@ -1273,6 +1420,103 @@ export default function App() {
               >
                 <Printer size={15} />
                 Print Receipt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* iOS & Manual Installation Guide Modal */}
+      {showIosModal && (
+        <div className="modal-overlay" onClick={() => setShowIosModal(false)}>
+          <div className="modal-card ios-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Smartphone size={18} color="#2563eb" />
+                <h3 className="modal-title">Install on Device</h3>
+              </div>
+              <button
+                type="button"
+                className="btn-modal-close"
+                onClick={() => setShowIosModal(false)}
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="ios-install-body">
+              <div className="ios-install-app-preview">
+                <img src="/icon.svg" alt="FeeManage Icon" width="48" height="48" />
+                <div>
+                  <strong>FeeManage App</strong>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    Add to your Home Screen for full app experience
+                  </p>
+                </div>
+              </div>
+
+              {isIos ? (
+                <>
+                  <p className="ios-install-intro">
+                    On iPhone / iPad Safari, install in 3 simple steps:
+                  </p>
+                  <div className="ios-steps-list">
+                    <div className="ios-step-item">
+                      <div className="ios-step-num">1</div>
+                      <div className="ios-step-text">
+                        Tap the <strong>Share</strong> button <Share2 size={14} className="inline-icon" /> in Safari's bottom toolbar.
+                      </div>
+                    </div>
+                    <div className="ios-step-item">
+                      <div className="ios-step-num">2</div>
+                      <div className="ios-step-text">
+                        Scroll down and tap <strong>"Add to Home Screen"</strong> with the <Plus size={14} className="inline-icon" /> icon.
+                      </div>
+                    </div>
+                    <div className="ios-step-item">
+                      <div className="ios-step-num">3</div>
+                      <div className="ios-step-text">
+                        Tap <strong>"Add"</strong> in the top-right corner to finish.
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="ios-install-intro">
+                    To install on Android, Chrome, or Windows PC:
+                  </p>
+                  <div className="ios-steps-list">
+                    <div className="ios-step-item">
+                      <div className="ios-step-num">1</div>
+                      <div className="ios-step-text">
+                        Open your browser menu (<strong>⋮</strong> or <strong>⋯</strong> in top-right).
+                      </div>
+                    </div>
+                    <div className="ios-step-item">
+                      <div className="ios-step-num">2</div>
+                      <div className="ios-step-text">
+                        Select <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong>.
+                      </div>
+                    </div>
+                    <div className="ios-step-item">
+                      <div className="ios-step-num">3</div>
+                      <div className="ios-step-text">
+                        Confirm <strong>"Install"</strong> to launch directly from your home screen or desktop.
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => setShowIosModal(false)}
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                Got It
               </button>
             </div>
           </div>

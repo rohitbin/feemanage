@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- Rounded App Icon Background -->
+  <rect width="512" height="512" rx="115" fill="url(#bgGrad)" />
+
+  <!-- Subtle glow -->
+  <circle cx="256" cy="220" r="140" fill="#ffffff" opacity="0.08" />
+
+  <!-- Register Document Sheet -->
+  <rect x="156" y="140" width="200" height="150" rx="20" fill="#ffffff" filter="url(#dropShadow)" />
+
+  <!-- Sheet Lines -->
+  <rect x="186" y="175" width="140" height="15" rx="7" fill="#2563eb" />
+  <rect x="186" y="205" width="100" height="12" rx="6" fill="#94a3b8" />
+  <rect x="186" y="232" width="125" height="12" rx="6" fill="#059669" />
+
+  <!-- Paid / Checked Badge -->
+  <g transform="translate(325, 260)">
+    <circle cx="0" cy="0" r="46" fill="#10b981" stroke="#ffffff" stroke-width="8" filter="url(#dropShadow)" />
+    <!-- Checkmark -->
+    <path d="M-18 -2 L-6 12 L20 -14" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+
+  <!-- App Title Typography -->
+  <text x="256" y="420" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="64" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="2">
+    FEE
+  </text>
+  <text x="256" y="455" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="600" fill="#bfdbfe" text-anchor="middle" letter-spacing="4">
+    REGISTER
+  </text>
+</svg>
