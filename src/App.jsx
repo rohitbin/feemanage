@@ -762,236 +762,430 @@ export default function App() {
               </p>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="students-table">
-                <thead>
-                  <tr>
-                    <th>Student Name</th>
-                    <th>Monthly Fee</th>
-                    <th>Enrollment Period</th>
-                    <th>Status & Months Due</th>
-                    <th>Remaining Dues</th>
-                    <th>Enter Amount & Pay</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredStudents.map((student) => {
-                    const days = getDaysCount(student.startDate, student.endDate);
-                    const initials = student.name
-                      .split(' ')
-                      .map((n) => n[0])
-                      .slice(0, 2)
-                      .join('')
-                      .toUpperCase();
+            <>
+              {/* Desktop Table View (Hidden on mobile phones <= 768px) */}
+              <div className="desktop-table-view" style={{ overflowX: 'auto' }}>
+                <table className="students-table">
+                  <thead>
+                    <tr>
+                      <th>Student Name</th>
+                      <th>Monthly Fee</th>
+                      <th>Enrollment Period</th>
+                      <th>Status & Months Due</th>
+                      <th>Remaining Dues</th>
+                      <th>Enter Amount & Pay</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStudents.map((student) => {
+                      const days = getDaysCount(student.startDate, student.endDate);
+                      const initials = student.name
+                        .split(' ')
+                        .map((n) => n[0])
+                        .slice(0, 2)
+                        .join('')
+                        .toUpperCase();
 
-                    const dues = student.duesInfo;
-                    const isMultiMonthOverdue = dues.remainingDues > 0 && dues.unpaidMonths >= 2;
-                    const hasDues = dues.remainingDues > 0;
+                      const dues = student.duesInfo;
+                      const isMultiMonthOverdue = dues.remainingDues > 0 && dues.unpaidMonths >= 2;
+                      const hasDues = dues.remainingDues > 0;
 
-                    // Current input amount for this student
-                    const currentInputAmount =
-                      customPayAmounts[student.id] !== undefined
-                        ? customPayAmounts[student.id]
-                        : String(dues.remainingDues);
+                      // Current input amount for this student
+                      const currentInputAmount =
+                        customPayAmounts[student.id] !== undefined
+                          ? customPayAmounts[student.id]
+                          : String(dues.remainingDues);
 
-                    return (
-                      <tr
-                        key={student.id}
-                        className={isMultiMonthOverdue ? 'row-overdue-critical' : ''}
-                      >
-                        {/* Student Name & Avatar */}
-                        <td>
-                          <div className="student-cell">
-                            <div className="student-avatar">{initials}</div>
-                            <div className="student-name-box">
-                              <span className="student-name">{student.name}</span>
-                              <span className="student-subtext">
-                                ID #{student.id.slice(-4)}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Monthly Fee */}
-                        <td>
-                          <span style={{ fontWeight: '600', color: '#1e293b' }}>
-                            {currency}{Number(student.monthlyFee).toLocaleString()}
-                          </span>
-                          <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginLeft: '2px' }}>
-                            /mo
-                          </span>
-                        </td>
-
-                        {/* Starting Date -> Ending Date */}
-                        <td>
-                          <div className="period-cell">
-                            <div className="period-dates">
-                              <span>{formatDisplayDate(student.startDate)}</span>
-                              <span className="period-arrow">➔</span>
-                              <span>{formatDisplayDate(student.endDate)}</span>
-                            </div>
-                            <div className="period-meta">
-                              <span className="month-end-tag">{days} Days</span>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Status Badge & Unpaid Months */}
-                        <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                            <span className={`status-pill ${dues.badgeType}`}>
-                              <span className="status-dot"></span>
-                              {dues.statusBadge}
-                            </span>
-                            <span className={`comparison-note ${isMultiMonthOverdue ? 'danger-text' : ''}`}>
-                              {dues.description}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Remaining Dues Calculation */}
-                        <td>
-                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <strong
-                              style={{
-                                fontSize: '16px',
-                                color: hasDues ? (isMultiMonthOverdue ? '#dc2626' : '#d97706') : '#059669',
-                              }}
-                            >
-                              {currency}{dues.remainingDues.toLocaleString()}
-                            </strong>
-
-                            {/* Detailed breakdown if multi-month or partial payment */}
-                            {dues.grossAccruedDues > student.monthlyFee && (
-                              <span style={{ fontSize: '11px', color: '#64748b', marginTop: '1px' }}>
-                                Total: {currency}{dues.grossAccruedDues.toLocaleString()} ({dues.unpaidMonths} mo)
-                              </span>
-                            )}
-
-                            {student.totalPaidAmount > 0 && (
-                              <span style={{ fontSize: '11px', color: '#059669', fontWeight: '600' }}>
-                                Paid: {currency}{student.totalPaidAmount.toLocaleString()}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Enter Amount & Pay */}
-                        <td>
-                          {hasDues ? (
-                            <div className="pay-amount-box">
-                              <div className="pay-input-wrapper">
-                                <span className="pay-input-prefix">{currency}</span>
-                                <input
-                                  type="number"
-                                  className="pay-custom-input"
-                                  placeholder="Amount"
-                                  value={currentInputAmount}
-                                  onChange={(e) =>
-                                    setCustomPayAmounts((prev) => ({
-                                      ...prev,
-                                      [student.id]: e.target.value,
-                                    }))
-                                  }
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      handleCustomPayment(student, dues);
-                                    }
-                                  }}
-                                  min="1"
-                                  title="Enter amount student paid (e.g. partial or full dues)"
-                                />
-                                <button
-                                  type="button"
-                                  className="btn-pay-submit"
-                                  onClick={() => handleCustomPayment(student, dues)}
-                                  title={`Record payment for ${student.name}`}
-                                >
-                                  <Check size={13} />
-                                  Pay
-                                </button>
+                      return (
+                        <tr
+                          key={student.id}
+                          className={isMultiMonthOverdue ? 'row-overdue-critical' : ''}
+                        >
+                          {/* Student Name & Avatar */}
+                          <td>
+                            <div className="student-cell">
+                              <div className="student-avatar">{initials}</div>
+                              <div className="student-name-box">
+                                <span className="student-name">{student.name}</span>
+                                <span className="student-subtext">
+                                  ID #{student.id.slice(-4)}
+                                </span>
                               </div>
+                            </div>
+                          </td>
 
-                              {/* Quick chips to fill 1 month or full dues */}
-                              <div className="quick-pay-chips">
-                                {dues.remainingDues > student.monthlyFee && (
+                          {/* Monthly Fee */}
+                          <td>
+                            <span style={{ fontWeight: '600', color: '#1e293b' }}>
+                              {currency}{Number(student.monthlyFee).toLocaleString()}
+                            </span>
+                            <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginLeft: '2px' }}>
+                              /mo
+                            </span>
+                          </td>
+
+                          {/* Starting Date -> Ending Date */}
+                          <td>
+                            <div className="period-cell">
+                              <div className="period-dates">
+                                <span>{formatDisplayDate(student.startDate)}</span>
+                                <span className="period-arrow">➔</span>
+                                <span>{formatDisplayDate(student.endDate)}</span>
+                              </div>
+                              <div className="period-meta">
+                                <span className="month-end-tag">{days} Days</span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Status Badge & Unpaid Months */}
+                          <td>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              <span className={`status-pill ${dues.badgeType}`}>
+                                <span className="status-dot"></span>
+                                {dues.statusBadge}
+                              </span>
+                              <span className={`comparison-note ${isMultiMonthOverdue ? 'danger-text' : ''}`}>
+                                {dues.description}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Remaining Dues Calculation */}
+                          <td>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <strong
+                                style={{
+                                  fontSize: '16px',
+                                  color: hasDues ? (isMultiMonthOverdue ? '#dc2626' : '#d97706') : '#059669',
+                                }}
+                              >
+                                {currency}{dues.remainingDues.toLocaleString()}
+                              </strong>
+
+                              {/* Detailed breakdown if multi-month or partial payment */}
+                              {dues.grossAccruedDues > student.monthlyFee && (
+                                <span style={{ fontSize: '11px', color: '#64748b', marginTop: '1px' }}>
+                                  Total: {currency}{dues.grossAccruedDues.toLocaleString()} ({dues.unpaidMonths} mo)
+                                </span>
+                              )}
+
+                              {student.totalPaidAmount > 0 && (
+                                <span style={{ fontSize: '11px', color: '#059669', fontWeight: '600' }}>
+                                  Paid: {currency}{student.totalPaidAmount.toLocaleString()}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Enter Amount & Pay */}
+                          <td>
+                            {hasDues ? (
+                              <div className="pay-amount-box">
+                                <div className="pay-input-wrapper">
+                                  <span className="pay-input-prefix">{currency}</span>
+                                  <input
+                                    type="number"
+                                    className="pay-custom-input"
+                                    placeholder="Amount"
+                                    value={currentInputAmount}
+                                    onChange={(e) =>
+                                      setCustomPayAmounts((prev) => ({
+                                        ...prev,
+                                        [student.id]: e.target.value,
+                                      }))
+                                    }
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleCustomPayment(student, dues);
+                                      }
+                                    }}
+                                    min="1"
+                                    title="Enter amount student paid (e.g. partial or full dues)"
+                                  />
+                                  <button
+                                    type="button"
+                                    className="btn-pay-submit"
+                                    onClick={() => handleCustomPayment(student, dues)}
+                                    title={`Record payment for ${student.name}`}
+                                  >
+                                    <Check size={13} />
+                                    Pay
+                                  </button>
+                                </div>
+
+                                {/* Quick chips to fill 1 month or full dues */}
+                                <div className="quick-pay-chips">
+                                  {dues.remainingDues > student.monthlyFee && (
+                                    <button
+                                      type="button"
+                                      className="quick-pay-chip"
+                                      onClick={() => handleSetQuickAmount(student.id, student.monthlyFee)}
+                                      title={`Pay 1 month (${currency}${student.monthlyFee})`}
+                                    >
+                                      1 Mo ({currency}{student.monthlyFee})
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     className="quick-pay-chip"
-                                    onClick={() => handleSetQuickAmount(student.id, student.monthlyFee)}
-                                    title={`Pay 1 month (${currency}${student.monthlyFee})`}
+                                    onClick={() => handleSetQuickAmount(student.id, dues.remainingDues)}
+                                    title={`Pay full remaining balance (${currency}${dues.remainingDues})`}
                                   >
-                                    1 Mo ({currency}{student.monthlyFee})
+                                    Full ({currency}{dues.remainingDues})
                                   </button>
-                                )}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="paid-action-group">
                                 <button
                                   type="button"
-                                  className="quick-pay-chip"
-                                  onClick={() => handleSetQuickAmount(student.id, dues.remainingDues)}
-                                  title={`Pay full remaining balance (${currency}${dues.remainingDues})`}
+                                  className="btn-receipt"
+                                  onClick={() =>
+                                    setReceiptData({
+                                      studentName: student.name,
+                                      id: student.id,
+                                      monthlyFee: student.monthlyFee,
+                                      amountPaidToday: student.lastPaymentAmount || student.totalPaidAmount || student.monthlyFee,
+                                      totalPaidSoFar: student.totalPaidAmount || student.monthlyFee,
+                                      grossAccruedDues: dues.grossAccruedDues,
+                                      remainingBalance: 0,
+                                      startDate: student.startDate,
+                                      endDate: student.endDate,
+                                      paidAt: student.paidAt,
+                                      status: 'All Dues Cleared',
+                                    })
+                                  }
+                                  title="View & Print Payment Receipt"
                                 >
-                                  Full ({currency}{dues.remainingDues})
+                                  <Receipt size={13} />
+                                  Receipt
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-undo-pay"
+                                  onClick={() => handleUndoPayment(student.id)}
+                                  title="Mark as unpaid if clicked by mistake"
+                                >
+                                  Undo
                                 </button>
                               </div>
-                            </div>
-                          ) : (
-                            <div className="paid-action-group">
-                              <button
-                                type="button"
-                                className="btn-receipt"
-                                onClick={() =>
-                                  setReceiptData({
-                                    studentName: student.name,
-                                    id: student.id,
-                                    monthlyFee: student.monthlyFee,
-                                    amountPaidToday: student.lastPaymentAmount || student.totalPaidAmount || student.monthlyFee,
-                                    totalPaidSoFar: student.totalPaidAmount || student.monthlyFee,
-                                    grossAccruedDues: dues.grossAccruedDues,
-                                    remainingBalance: 0,
-                                    startDate: student.startDate,
-                                    endDate: student.endDate,
-                                    paidAt: student.paidAt,
-                                    status: 'All Dues Cleared',
-                                  })
-                                }
-                                title="View & Print Payment Receipt"
-                              >
-                                <Receipt size={13} />
-                                Receipt
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-undo-pay"
-                                onClick={() => handleUndoPayment(student.id)}
-                                title="Mark as unpaid if clicked by mistake"
-                              >
-                                Undo
-                              </button>
-                            </div>
-                          )}
-                        </td>
+                            )}
+                          </td>
 
-                        {/* Row Options */}
-                        <td style={{ textAlign: 'right' }}>
-                          <div className="row-actions">
+                          {/* Row Options */}
+                          <td style={{ textAlign: 'right' }}>
+                            <div className="row-actions">
+                              <button
+                                type="button"
+                                className="btn-icon-subtle delete"
+                                onClick={() => handleDeleteStudent(student.id, student.name)}
+                                title="Remove Student"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Cards View (Visible on mobile phones <= 768px) */}
+              <div className="mobile-cards-view">
+                {filteredStudents.map((student) => {
+                  const days = getDaysCount(student.startDate, student.endDate);
+                  const initials = student.name
+                    .split(' ')
+                    .map((n) => n[0])
+                    .slice(0, 2)
+                    .join('')
+                    .toUpperCase();
+
+                  const dues = student.duesInfo;
+                  const isMultiMonthOverdue = dues.remainingDues > 0 && dues.unpaidMonths >= 2;
+                  const hasDues = dues.remainingDues > 0;
+
+                  const currentInputAmount =
+                    customPayAmounts[student.id] !== undefined
+                      ? customPayAmounts[student.id]
+                      : String(dues.remainingDues);
+
+                  return (
+                    <div
+                      key={student.id}
+                      className={`mobile-student-card ${isMultiMonthOverdue ? 'overdue-card' : ''}`}
+                    >
+                      {/* Card Header: Avatar, Name, Status Badge */}
+                      <div className="mobile-card-header">
+                        <div className="mobile-student-info">
+                          <div className="mobile-avatar">{initials}</div>
+                          <div className="mobile-name-box">
+                            <span className="mobile-name">{student.name}</span>
+                            <span className="mobile-id">ID #{student.id.slice(-4)}</span>
+                          </div>
+                        </div>
+                        <span className={`status-pill ${dues.badgeType}`}>
+                          <span className="status-dot"></span>
+                          {dues.statusBadge}
+                        </span>
+                      </div>
+
+                      {/* Card Meta Grid: Fee & Cycle */}
+                      <div className="mobile-meta-grid">
+                        <div className="mobile-meta-item">
+                          <span className="mobile-meta-label">Monthly Rate</span>
+                          <span className="mobile-meta-val">
+                            {currency}{Number(student.monthlyFee).toLocaleString()} /mo
+                          </span>
+                        </div>
+                        <div className="mobile-meta-item">
+                          <span className="mobile-meta-label">Cycle ({days} Days)</span>
+                          <span className="mobile-meta-val">
+                            {formatDisplayDate(student.startDate)} ➔ {formatDisplayDate(student.endDate)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Dues Highlight Box */}
+                      <div
+                        className={`mobile-dues-box ${
+                          isMultiMonthOverdue ? 'critical' : hasDues ? '' : 'cleared'
+                        }`}
+                      >
+                        <div className="mobile-dues-label-col">
+                          <span className="mobile-dues-title">
+                            {hasDues ? 'Remaining Dues' : 'Fee Status'}
+                          </span>
+                          <span className="mobile-dues-sub">
+                            {hasDues ? dues.description : 'All dues cleared for this cycle'}
+                          </span>
+                        </div>
+                        <span className="mobile-dues-amount">
+                          {currency}{dues.remainingDues.toLocaleString()}
+                        </span>
+                      </div>
+
+                      {/* Payment Section */}
+                      {hasDues ? (
+                        <div className="mobile-pay-section">
+                          <div className="mobile-pay-input-row">
+                            <div className="mobile-pay-input-box">
+                              <span className="pay-input-prefix">{currency}</span>
+                              <input
+                                type="number"
+                                placeholder="Amount"
+                                value={currentInputAmount}
+                                onChange={(e) =>
+                                  setCustomPayAmounts((prev) => ({
+                                    ...prev,
+                                    [student.id]: e.target.value,
+                                  }))
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleCustomPayment(student, dues);
+                                  }
+                                }}
+                                min="1"
+                              />
+                            </div>
                             <button
                               type="button"
-                              className="btn-icon-subtle delete"
-                              onClick={() => handleDeleteStudent(student.id, student.name)}
-                              title="Remove Student"
+                              className="mobile-btn-pay"
+                              onClick={() => handleCustomPayment(student, dues)}
                             >
-                              <Trash2 size={15} />
+                              <Check size={16} />
+                              Pay
                             </button>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+
+                          {/* Quick Tap Chips */}
+                          <div className="mobile-quick-chips">
+                            {dues.remainingDues > student.monthlyFee && (
+                              <button
+                                type="button"
+                                className="mobile-quick-chip"
+                                onClick={() =>
+                                  handleSetQuickAmount(student.id, student.monthlyFee)
+                                }
+                              >
+                                1 Mo ({currency}{student.monthlyFee})
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="mobile-quick-chip"
+                              onClick={() =>
+                                handleSetQuickAmount(student.id, dues.remainingDues)
+                              }
+                            >
+                              Full ({currency}{dues.remainingDues})
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="paid-action-group" style={{ justifyContent: 'space-between' }}>
+                          <button
+                            type="button"
+                            className="btn-receipt"
+                            onClick={() =>
+                              setReceiptData({
+                                studentName: student.name,
+                                id: student.id,
+                                monthlyFee: student.monthlyFee,
+                                amountPaidToday:
+                                  student.lastPaymentAmount ||
+                                  student.totalPaidAmount ||
+                                  student.monthlyFee,
+                                totalPaidSoFar:
+                                  student.totalPaidAmount || student.monthlyFee,
+                                grossAccruedDues: dues.grossAccruedDues,
+                                remainingBalance: 0,
+                                startDate: student.startDate,
+                                endDate: student.endDate,
+                                paidAt: student.paidAt,
+                                status: 'All Dues Cleared',
+                              })
+                            }
+                          >
+                            <Receipt size={14} />
+                            View Receipt
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-undo-pay"
+                            onClick={() => handleUndoPayment(student.id)}
+                          >
+                            Undo
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Card Footer: Remove */}
+                      <div className="mobile-card-footer">
+                        <span style={{ fontSize: '11px', color: 'var(--text-light)' }}>
+                          Enrolled: {formatDisplayDate(student.startDate)}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn-icon-subtle delete"
+                          onClick={() => handleDeleteStudent(student.id, student.name)}
+                          title="Remove Student"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       </section>
