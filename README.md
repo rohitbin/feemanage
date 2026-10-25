@@ -19,6 +19,11 @@ A modern, responsive React web application designed for tutors, coaching institu
 - **Dashboard Overview**:
   - Real-time counters for Total Enrolled, Fees Collected, Total Outstanding Dues, and 3+ Months Overdue alert.
   - Filter tabs to isolate overdue accounts, pending dues, or cleared students.
+- **Progressive Web App (PWA) & Device Installation**:
+  - Installable directly to phone home screen (Android & iOS) or desktop (Windows & Mac).
+  - Prominent welcome install banner when visiting the website.
+  - Dedicated "Install App" button in the header.
+  - Offline capability with Service Worker caching.
 - **Persistent Storage**:
   - All students, payment histories, and currency settings (`₹`, `$`, `€`, `£`) persist in `localStorage`.
 
