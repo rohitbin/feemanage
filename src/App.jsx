@@ -393,10 +393,10 @@ export default function App() {
           <div className="brand-icon">
             <Users size={22} />
           </div>
-          <div>
+          <div className="brand-text-block">
             <h1 className="brand-title">Student Fee Register</h1>
             <p className="brand-subtitle">
-              Custom payment amounts, multi-month dues calculation (e.g. ₹200/mo × 3 mo = ₹600) & instant receipt generator
+              Custom payment amounts, multi-month dues calculation (e.g. {currency}200/mo × 3 mo = {currency}600) & instant receipt generator
             </p>
           </div>
         </div>
@@ -476,7 +476,7 @@ export default function App() {
             <span className="stat-label">Total Fees Collected</span>
             <span className="stat-value">
               {currency}{totalFeeCollected.toLocaleString()}
-              <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-muted)', marginLeft: '6px' }}>
+              <span className="stat-subtext">
                 ({allPaidStudents.length} cleared)
               </span>
             </span>
@@ -491,7 +491,7 @@ export default function App() {
             <span className="stat-label">Total Outstanding Dues</span>
             <span className="stat-value" style={{ color: '#d97706' }}>
               {currency}{totalOutstandingDues.toLocaleString()}
-              <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-muted)', marginLeft: '6px' }}>
+              <span className="stat-subtext">
                 ({allPendingStudents.length} pending)
               </span>
             </span>
