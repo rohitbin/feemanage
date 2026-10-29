@@ -22,99 +22,19 @@ export function getFirstDayOfCurrentMonthISO() {
   return formatDateToISO(new Date(now.getFullYear(), now.getMonth(), 1));
 }
 
-// Get the last day of the given date's month (or current month) formatted as YYYY-MM-DD
-export function getLastDayOfMonthISO(dateStr) {
-  const parts = dateStr
-    ? dateStr.split('-').map(Number)
-    : [new Date().getFullYear(), new Date().getMonth() + 1, 1];
-  const year = parts[0];
-  const month = parts[1]; // 1-indexed (1-12)
-  // Day 0 of next month is the last day of current month
-  const lastDay = new Date(year, month, 0);
-  return formatDateToISO(lastDay);
-}
-
 /**
- * Calculates fee ending date:
- * The fee period ends on the LAST DAY of the cycle/month, NOT the starting day.
- *
- * Examples:
- * - Starting on 1st of month:
- *   1 month: Nov 01 -> Nov 30 (Last day of November, NOT Dec 01)
- *            Oct 01 -> Oct 31 (Last day of October, NOT Nov 01)
- *            Feb 01 -> Feb 28 (Last day of February, NOT Mar 01)
- *   2 months: Nov 01 -> Dec 31 (Last day of December)
- *   3 months: Nov 01 -> Jan 31 (Last day of January)
- *
- * - Starting on any other day (e.g. 25th):
- *   1 month: Oct 25 -> Nov 24 (Last day of cycle, NOT Nov 25)
- *            Nov 25 -> Dec 24 (Last day of cycle, NOT Dec 25)
- *            Oct 10 -> Nov 09 (Last day of cycle, NOT Nov 10)
- */
-export function calculateEndDateByMonths(startDateStr, durationMonths = 1) {
-  if (!startDateStr) return '';
-  const parts = startDateStr.split('-').map(Number);
-  if (parts.length !== 3) return '';
-
-  const [year, month, day] = parts; // month is 1-indexed (1-12)
-  const duration = Math.max(1, Number(durationMonths) || 1);
-
-  // If starting on the 1st of the month, fee covers full calendar month(s).
-  // Ending date is the LAST DAY of that target month (e.g. Nov 30, Oct 31).
-  if (day === 1) {
-    const endOfTargetMonth = new Date(year, (month - 1) + duration, 0);
-    return formatDateToISO(endOfTargetMonth);
-  }
-
-  // If starting on the last day of a month (e.g. Jan 31, Feb 28, Apr 30):
-  const daysInStartMonth = new Date(year, month, 0).getDate();
-  if (day === daysInStartMonth) {
-    const endOfTargetMonth = new Date(year, (month - 1) + duration + 1, 0);
-    return formatDateToISO(endOfTargetMonth);
-  }
-
-  // For any mid-month start day (e.g. 25th, 10th):
-  // Next cycle starts on day D after 'duration' months.
-  // The ending date is ONE DAY BEFORE the next cycle starting day (last day of cycle, NOT starting day).
-  const targetMonthIndex = (month - 1) + duration;
-  const targetYear = year + Math.floor(targetMonthIndex / 12);
-  const normMonthIndex = ((targetMonthIndex % 12) + 12) % 12;
-
-  // Days in target month
-  const daysInTargetMonth = new Date(targetYear, normMonthIndex + 1, 0).getDate();
-  const clampedDay = Math.min(day, daysInTargetMonth);
-
-  // Next cycle starting day
-  const nextCycleStart = new Date(targetYear, normMonthIndex, clampedDay);
-
-  // Fee ends on the last day before the next cycle starts
-  nextCycleStart.setDate(nextCycleStart.getDate() - 1);
-
-  return formatDateToISO(nextCycleStart);
-}
-
-/**
- * Calculates ending date by adding days or months.
- * Ending date is ALWAYS the last day of the cycle, NOT the starting day.
+ * Calculates ending date by adding a given number of days (default 30 days)
+ * E.g. 1 Month = 30 days, 2 Months = 60 days, 3 Months = 90 days.
  */
 export function calculateEndDateByDays(startDateStr, days = 30) {
   if (!startDateStr) return '';
-  const numDays = Number(days) || 30;
-
-  // If days is a multiple of 30 (e.g. 30, 60, 90), use the accurate month-based calculation
-  if (numDays % 30 === 0) {
-    return calculateEndDateByMonths(startDateStr, Math.round(numDays / 30));
-  }
-
-  // Otherwise calculate inclusive days (day 1 to day N)
   const parts = startDateStr.split('-').map(Number);
   if (parts.length !== 3) return '';
 
   const date = new Date(parts[0], parts[1] - 1, parts[2]);
   if (isNaN(date.getTime())) return '';
 
-  // Ending day of N days is date + N - 1 days (not N days, which would be the starting day of next cycle)
-  date.setDate(date.getDate() + numDays - 1);
+  date.setDate(date.getDate() + Number(days));
   return formatDateToISO(date);
 }
 
@@ -139,8 +59,7 @@ export function formatDisplayDate(dateStr) {
 }
 
 // Calculate exact days between two dates
-// If inclusive is true, includes both start date and end date (e.g. Nov 1 to Nov 30 is 30 days)
-export function getDaysCount(startDateStr, endDateStr, inclusive = false) {
+export function getDaysCount(startDateStr, endDateStr) {
   if (!startDateStr || !endDateStr) return 0;
   const sParts = startDateStr.split('-').map(Number);
   const eParts = endDateStr.split('-').map(Number);
@@ -151,25 +70,30 @@ export function getDaysCount(startDateStr, endDateStr, inclusive = false) {
   if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
 
   const diffTime = e.getTime() - s.getTime();
-  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-  return inclusive ? diffDays + 1 : diffDays;
+  return Math.round(diffTime / (1000 * 60 * 60 * 24));
 }
 
 /**
  * Comprehensive Dues & Partial Payment Calculator:
  *
- * Handles:
- * 1. Accrued Gross Dues based on elapsed months (e.g. 3 months @ ₹200 = ₹600).
- * 2. Custom partial payments entered by user (e.g. student paid ₹300, remaining dues = ₹300).
- * 3. Advance payments (e.g. student pays more than gross dues).
- * 4. Exact status badges (Overdue, Partially Paid, All Dues Cleared, Active).
+ * Exact 30-day billing cycle progression:
+ * 1. Cycle length is exact 30 days per month.
+ * 2. Month 1 (days 0..30): Student has 1 month fee due (pending during active cycle).
+ * 3. Enters Next Month (days 31..60): Student has not submitted first month fee and entered next month.
+ *    Shows 1 month due not paid / overdue.
+ * 4. After Finishing Next Month (days 61..90): Month 2 has now finished.
+ *    Shows 2 months dues not paid!
+ * 5. After Finishing Month 3 (days 91..120):
+ *    Shows 3 months dues not paid, and so on.
+ * 6. Supports custom partial payments, advance payments, and cleared badges.
  */
 export function calculateStudentDuesAndStatus(
   startDateStr,
   endDateStr,
   monthlyFee = 200,
   isPaid = false,
-  totalPaidAmount = 0
+  totalPaidAmount = 0,
+  currency = '₹'
 ) {
   const fee = Number(monthlyFee) || 200;
   const paidAmount = Number(totalPaidAmount) || 0;
@@ -184,7 +108,7 @@ export function calculateStudentDuesAndStatus(
       isOverdue: false,
       statusBadge: remaining === 0 ? 'All Dues Cleared' : 'Pending',
       badgeType: remaining === 0 ? 'active' : 'warning',
-      description: remaining === 0 ? 'Paid' : `₹${remaining} remaining`,
+      description: remaining === 0 ? 'Paid' : `${currency}${remaining} remaining`,
     };
   }
 
@@ -200,16 +124,31 @@ export function calculateStudentDuesAndStatus(
   // Days since start date
   const daysSinceStart = Math.max(0, Math.round((todayMid - startMid) / (1000 * 60 * 60 * 24)));
 
-  // Days past end date (positive means cycle expired)
+  // Days past end date (positive means initial 30-day cycle has expired)
   const daysPastEnd = Math.round((todayMid - endMid) / (1000 * 60 * 60 * 24));
 
-  // Calculate gross accrued months
-  let accruedMonths = 1;
+  // Base duration of the enrolled period in 30-day cycles
+  const diffTime = endMid - startMid;
+  const cycleDays = Math.max(30, Math.round(diffTime / (1000 * 60 * 60 * 24)));
+  const initialDurationMonths = Math.max(1, Math.round(cycleDays / 30));
+
+  /**
+   * Exact 30-day Multi-Month Accrual Rule:
+   * - During initial cycle (daysPastEnd <= 0): accruedMonths = initialDurationMonths (e.g. 1 month).
+   * - When initial cycle expires and student enters next month (daysPastEnd = 1..30):
+   *     The first month was not paid. They are in month 2, but month 2 is not finished.
+   *     accruedMonths = initialDurationMonths (1 month dues not paid).
+   * - AFTER finishing next month (daysPastEnd = 31..60):
+   *     Now month 2 has finished.
+   *     accruedMonths = initialDurationMonths + 1 (2 months dues not paid!).
+   * - AFTER finishing month 3 (daysPastEnd = 61..90):
+   *     Now month 3 has finished.
+   *     accruedMonths = initialDurationMonths + 2 (3 months dues not paid!), and so on.
+   */
+  let accruedMonths = initialDurationMonths;
   if (daysPastEnd > 0) {
-    accruedMonths = Math.max(1, Math.ceil(daysSinceStart / 30));
-  } else {
-    const cycleDays = Math.max(30, getDaysCount(startDateStr, endDateStr));
-    accruedMonths = Math.max(1, Math.round(cycleDays / 30));
+    const additionalFinishedMonths = Math.floor((daysPastEnd - 1) / 30);
+    accruedMonths = initialDurationMonths + additionalFinishedMonths;
   }
 
   // Total gross fees accrued so far
@@ -235,7 +174,7 @@ export function calculateStudentDuesAndStatus(
       isOverdue: false,
       statusBadge: 'All Dues Cleared ✓',
       badgeType: 'active',
-      description: remainingDays > 0 ? `${remainingDays} days left in cycle` : 'Fully paid',
+      description: remainingDays > 0 ? `${remainingDays} days left in 30-day cycle` : 'All dues fully cleared',
     };
   }
 
@@ -248,14 +187,15 @@ export function calculateStudentDuesAndStatus(
       remainingDues,
       unpaidMonths: remainingMonths,
       isOverdue: daysPastEnd > 0,
-      statusBadge: `Partially Paid (${fee > 0 ? `${paidAmount}/${grossAccruedDues}` : ''})`,
+      statusBadge: `Partially Paid (${fee > 0 ? `${currency}${paidAmount}/${currency}${grossAccruedDues}` : ''})`,
       badgeType: 'warning',
-      description: `Paid ₹${paidAmount} so far · ₹${remainingDues} remaining dues`,
+      description: `Paid ${currency}${paidAmount} so far · ${currency}${remainingDues} dues not paid (${remainingMonths} mo remaining)`,
     };
   }
 
-  // Case 3: No money paid yet, check overdue status
+  // Case 3: No money paid yet and initial cycle expired (Overdue multi-month dues)
   if (daysPastEnd > 0) {
+    const currentMonthNumber = accruedMonths + 1;
     return {
       grossAccruedDues,
       totalPaidAmount: 0,
@@ -264,25 +204,38 @@ export function calculateStudentDuesAndStatus(
       isOverdue: true,
       statusBadge:
         accruedMonths >= 3
-          ? `🚨 ${accruedMonths} Months Overdue`
+          ? `🚨 ${accruedMonths} Months Dues Not Paid`
           : accruedMonths === 2
-          ? `⚠️ 2 Months Overdue`
-          : `⚠️ 1 Month Overdue`,
+          ? `⚠️ 2 Months Dues Not Paid`
+          : `⚠️ 1 Month Due Not Paid`,
       badgeType: accruedMonths >= 2 ? 'critical' : 'warning',
-      description: `${accruedMonths} months not submitted (${daysSinceStart} days since start)`,
+      description:
+        accruedMonths === 1
+          ? `1 month dues not paid · In Month 2 (${daysSinceStart} days since start)`
+          : accruedMonths === 2
+          ? `2 months dues not paid · In Month 3 (${daysSinceStart} days since start)`
+          : `${accruedMonths} months dues not paid · In Month ${currentMonthNumber} (${daysSinceStart} days since start)`,
     };
   }
 
-  // Case 4: First month cycle pending
+  // Case 4: Initial cycle active / pending
   const remainingDays = Math.max(0, -daysPastEnd);
   return {
     grossAccruedDues,
     totalPaidAmount: 0,
     remainingDues: grossAccruedDues,
-    unpaidMonths: 1,
+    unpaidMonths: initialDurationMonths,
     isOverdue: false,
-    statusBadge: accruedMonths > 1 ? `${accruedMonths} Months Pending` : 'Due This Month',
+    statusBadge:
+      remainingDays === 0
+        ? 'Due Today'
+        : initialDurationMonths > 1
+        ? `${initialDurationMonths} Months Due`
+        : 'Due This Month',
     badgeType: 'warning',
-    description: `${remainingDays} days left in current cycle`,
+    description:
+      remainingDays === 0
+        ? 'Last day of 30-day cycle · Due today'
+        : `${remainingDays} days left in 30-day cycle`,
   };
 }

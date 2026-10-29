@@ -766,6 +766,15 @@
   color: #991b1b;
 }
 
+.filter-tab.warning-tab {
+  color: #b45309;
+}
+
+.filter-tab.warning-tab.active {
+  background: #fffbeb;
+  color: #92400e;
+}
+
 .filter-count {
   font-size: 11px;
   background: #e2e8f0;
