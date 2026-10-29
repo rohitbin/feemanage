@@ -22,19 +22,99 @@ export function getFirstDayOfCurrentMonthISO() {
   return formatDateToISO(new Date(now.getFullYear(), now.getMonth(), 1));
 }
 
+// Get the last day of the given date's month (or current month) formatted as YYYY-MM-DD
+export function getLastDayOfMonthISO(dateStr) {
+  const parts = dateStr
+    ? dateStr.split('-').map(Number)
+    : [new Date().getFullYear(), new Date().getMonth() + 1, 1];
+  const year = parts[0];
+  const month = parts[1]; // 1-indexed (1-12)
+  // Day 0 of next month is the last day of current month
+  const lastDay = new Date(year, month, 0);
+  return formatDateToISO(lastDay);
+}
+
 /**
- * Calculates ending date by adding a given number of days (default 30 days)
- * E.g. 1 Month = 30 days, 2 Months = 60 days, 3 Months = 90 days.
+ * Calculates fee ending date:
+ * The fee period ends on the LAST DAY of the cycle/month, NOT the starting day.
+ *
+ * Examples:
+ * - Starting on 1st of month:
+ *   1 month: Nov 01 -> Nov 30 (Last day of November, NOT Dec 01)
+ *            Oct 01 -> Oct 31 (Last day of October, NOT Nov 01)
+ *            Feb 01 -> Feb 28 (Last day of February, NOT Mar 01)
+ *   2 months: Nov 01 -> Dec 31 (Last day of December)
+ *   3 months: Nov 01 -> Jan 31 (Last day of January)
+ *
+ * - Starting on any other day (e.g. 25th):
+ *   1 month: Oct 25 -> Nov 24 (Last day of cycle, NOT Nov 25)
+ *            Nov 25 -> Dec 24 (Last day of cycle, NOT Dec 25)
+ *            Oct 10 -> Nov 09 (Last day of cycle, NOT Nov 10)
+ */
+export function calculateEndDateByMonths(startDateStr, durationMonths = 1) {
+  if (!startDateStr) return '';
+  const parts = startDateStr.split('-').map(Number);
+  if (parts.length !== 3) return '';
+
+  const [year, month, day] = parts; // month is 1-indexed (1-12)
+  const duration = Math.max(1, Number(durationMonths) || 1);
+
+  // If starting on the 1st of the month, fee covers full calendar month(s).
+  // Ending date is the LAST DAY of that target month (e.g. Nov 30, Oct 31).
+  if (day === 1) {
+    const endOfTargetMonth = new Date(year, (month - 1) + duration, 0);
+    return formatDateToISO(endOfTargetMonth);
+  }
+
+  // If starting on the last day of a month (e.g. Jan 31, Feb 28, Apr 30):
+  const daysInStartMonth = new Date(year, month, 0).getDate();
+  if (day === daysInStartMonth) {
+    const endOfTargetMonth = new Date(year, (month - 1) + duration + 1, 0);
+    return formatDateToISO(endOfTargetMonth);
+  }
+
+  // For any mid-month start day (e.g. 25th, 10th):
+  // Next cycle starts on day D after 'duration' months.
+  // The ending date is ONE DAY BEFORE the next cycle starting day (last day of cycle, NOT starting day).
+  const targetMonthIndex = (month - 1) + duration;
+  const targetYear = year + Math.floor(targetMonthIndex / 12);
+  const normMonthIndex = ((targetMonthIndex % 12) + 12) % 12;
+
+  // Days in target month
+  const daysInTargetMonth = new Date(targetYear, normMonthIndex + 1, 0).getDate();
+  const clampedDay = Math.min(day, daysInTargetMonth);
+
+  // Next cycle starting day
+  const nextCycleStart = new Date(targetYear, normMonthIndex, clampedDay);
+
+  // Fee ends on the last day before the next cycle starts
+  nextCycleStart.setDate(nextCycleStart.getDate() - 1);
+
+  return formatDateToISO(nextCycleStart);
+}
+
+/**
+ * Calculates ending date by adding days or months.
+ * Ending date is ALWAYS the last day of the cycle, NOT the starting day.
  */
 export function calculateEndDateByDays(startDateStr, days = 30) {
   if (!startDateStr) return '';
+  const numDays = Number(days) || 30;
+
+  // If days is a multiple of 30 (e.g. 30, 60, 90), use the accurate month-based calculation
+  if (numDays % 30 === 0) {
+    return calculateEndDateByMonths(startDateStr, Math.round(numDays / 30));
+  }
+
+  // Otherwise calculate inclusive days (day 1 to day N)
   const parts = startDateStr.split('-').map(Number);
   if (parts.length !== 3) return '';
 
   const date = new Date(parts[0], parts[1] - 1, parts[2]);
   if (isNaN(date.getTime())) return '';
 
-  date.setDate(date.getDate() + Number(days));
+  // Ending day of N days is date + N - 1 days (not N days, which would be the starting day of next cycle)
+  date.setDate(date.getDate() + numDays - 1);
   return formatDateToISO(date);
 }
 
@@ -59,7 +139,8 @@ export function formatDisplayDate(dateStr) {
 }
 
 // Calculate exact days between two dates
-export function getDaysCount(startDateStr, endDateStr) {
+// If inclusive is true, includes both start date and end date (e.g. Nov 1 to Nov 30 is 30 days)
+export function getDaysCount(startDateStr, endDateStr, inclusive = false) {
   if (!startDateStr || !endDateStr) return 0;
   const sParts = startDateStr.split('-').map(Number);
   const eParts = endDateStr.split('-').map(Number);
@@ -70,7 +151,8 @@ export function getDaysCount(startDateStr, endDateStr) {
   if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
 
   const diffTime = e.getTime() - s.getTime();
-  return Math.round(diffTime / (1000 * 60 * 60 * 24));
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+  return inclusive ? diffDays + 1 : diffDays;
 }
 
 /**

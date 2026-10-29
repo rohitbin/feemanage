@@ -20,8 +20,11 @@ import {
   Share2,
 } from 'lucide-react';
 import {
+  formatDateToISO,
   getTodayISO,
   getFirstDayOfCurrentMonthISO,
+  getLastDayOfMonthISO,
+  calculateEndDateByMonths,
   calculateEndDateByDays,
   calculateStudentDuesAndStatus,
   formatDisplayDate,
@@ -91,7 +94,27 @@ export default function App() {
   const [students, setStudents] = useState(() => {
     try {
       const saved = localStorage.getItem('feemanage_students_v5');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          // Sanitize any existing student whose endDate equaled the starting day due to legacy 30-day bug
+          return parsed.map((s) => {
+            if (s.startDate && s.endDate) {
+              const sDay = s.startDate.split('-')[2];
+              const eDay = s.endDate.split('-')[2];
+              if (sDay === eDay) {
+                const [ey, em, ed] = s.endDate.split('-').map(Number);
+                const correctedEnd = new Date(ey, em - 1, ed - 1);
+                return {
+                  ...s,
+                  endDate: formatDateToISO(correctedEnd),
+                };
+              }
+            }
+            return s;
+          });
+        }
+      }
     } catch (e) {
       console.error('Failed to parse saved students', e);
     }
@@ -112,13 +135,15 @@ export default function App() {
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState(getTodayISO);
   const [durationMonths, setDurationMonths] = useState(1); // 1, 2, or 3 months
+  const [endDate, setEndDate] = useState(() => calculateEndDateByMonths(getTodayISO(), 1));
+  const [isCustomEndDate, setIsCustomEndDate] = useState(false);
   const [monthlyFeeInput, setMonthlyFeeInput] = useState('');
 
   // Individual custom payment input state per student: { [studentId]: string }
   const [customPayAmounts, setCustomPayAmounts] = useState({});
 
-  // Auto-calculated end date from start date and duration (30 days per month)
-  const autoEndDate = calculateEndDateByDays(startDate, durationMonths * 30);
+  // Effective end date from start date and duration (ends on the last day, NOT starting day)
+  const effectiveFormEndDate = endDate || calculateEndDateByMonths(startDate, durationMonths);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -254,7 +279,7 @@ export default function App() {
     }
 
     const fee = isNaN(effectiveMonthlyFee) || effectiveMonthlyFee <= 0 ? defaultMonthlyFee : effectiveMonthlyFee;
-    const effectiveEndDate = autoEndDate || calculateEndDateByDays(startDate, durationMonths * 30);
+    const effectiveEndDate = endDate || calculateEndDateByMonths(startDate, durationMonths);
 
     const newStudent = {
       id: Date.now().toString(),
@@ -272,6 +297,13 @@ export default function App() {
     setStudents((prev) => [newStudent, ...prev]);
     setName('');
     setMonthlyFeeInput('');
+
+    // Reset date picker to today and standard month end
+    const today = getTodayISO();
+    setStartDate(today);
+    setEndDate(calculateEndDateByMonths(today, 1));
+    setIsCustomEndDate(false);
+    setDurationMonths(1);
 
     setToastMessage(`✓ ${trimmedName} enrolled! Fee: ${currency}${fee}/mo, Period: ${formatDisplayDate(startDate)} to ${formatDisplayDate(effectiveEndDate)}`);
 
@@ -308,10 +340,19 @@ export default function App() {
     let updatedStartDate = student.startDate;
     let updatedEndDate = student.endDate;
 
-    // If fully paid, advance cycle to current date + 30 days
+    // If fully paid, advance cycle so ending date is the last day, not starting day
     if (isNowFullyPaid) {
-      updatedStartDate = getTodayISO();
-      updatedEndDate = calculateEndDateByDays(updatedStartDate, 30);
+      const today = getTodayISO();
+      if (student.startDate && student.startDate.endsWith('-01')) {
+        // Was on 1st-of-month calendar cycle, advance to next month 1st -> last day
+        const [curEndYear, curEndMonth] = (student.endDate || today).split('-').map(Number);
+        const nextMonthStart = new Date(curEndYear, curEndMonth, 1);
+        updatedStartDate = formatDateToISO(nextMonthStart);
+        updatedEndDate = calculateEndDateByMonths(updatedStartDate, 1);
+      } else {
+        updatedStartDate = today;
+        updatedEndDate = calculateEndDateByMonths(updatedStartDate, 1);
+      }
     }
 
     setStudents((prev) =>
@@ -392,12 +433,48 @@ export default function App() {
     }
   };
 
-  // Quick date presets
+  // Handle start date input change
+  const handleStartDateChange = (newStartDate) => {
+    setStartDate(newStartDate);
+    if (!isCustomEndDate) {
+      setEndDate(calculateEndDateByMonths(newStartDate, durationMonths));
+    }
+  };
+
+  // Quick date presets for Start Date
   const setDatePreset = (preset) => {
     if (preset === 'today') {
-      setStartDate(getTodayISO());
+      const today = getTodayISO();
+      setStartDate(today);
+      if (!isCustomEndDate) {
+        setEndDate(calculateEndDateByMonths(today, durationMonths));
+      }
     } else if (preset === 'month_start') {
-      setStartDate(getFirstDayOfCurrentMonthISO());
+      const monthStart = getFirstDayOfCurrentMonthISO();
+      setStartDate(monthStart);
+      // When starting on 1st of month, end date automatically defaults to the last day of the month
+      setEndDate(calculateEndDateByMonths(monthStart, durationMonths));
+      setIsCustomEndDate(false);
+    }
+  };
+
+  // Quick presets for Ending Date
+  const handleSetEndDatePreset = (preset) => {
+    if (preset === 'month_end') {
+      setEndDate(getLastDayOfMonthISO(startDate));
+      setIsCustomEndDate(true);
+    } else if (preset === '1_month') {
+      setDurationMonths(1);
+      setEndDate(calculateEndDateByMonths(startDate, 1));
+      setIsCustomEndDate(false);
+    } else if (preset === '2_months') {
+      setDurationMonths(2);
+      setEndDate(calculateEndDateByMonths(startDate, 2));
+      setIsCustomEndDate(false);
+    } else if (preset === '3_months') {
+      setDurationMonths(3);
+      setEndDate(calculateEndDateByMonths(startDate, 3));
+      setIsCustomEndDate(false);
     }
   };
 
@@ -682,7 +759,7 @@ export default function App() {
             Enroll New Student
           </h2>
           <p className="panel-desc">
-            Type student name and press Enter. Monthly fee defaults to {currency}{defaultMonthlyFee}, start date defaults to today, and end date calculates to exact 30-day cycles.
+            Type student name and press Enter. Monthly fee defaults to {currency}{defaultMonthlyFee}, start date defaults to today or 1st of month, and ending date calculates to the last day of the fee period.
           </p>
         </div>
 
@@ -718,7 +795,7 @@ export default function App() {
                 type="date"
                 className="form-input"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => handleStartDateChange(e.target.value)}
                 required
               />
               <div className="quick-date-chips">
@@ -739,40 +816,51 @@ export default function App() {
               </div>
             </div>
 
-            {/* Ending Date & Duration Selector */}
+            {/* Ending Date & Presets */}
             <div className="form-group">
-              <label className="form-label">
-                Ending Date <span className="label-hint">({durationMonths * 30} Days)</span>
+              <label className="form-label" htmlFor="end-date">
+                Ending Date <span className="label-hint">(Last day of fee period)</span>
               </label>
-              <div className="auto-end-date-box" title="Calculated automatically from starting date">
-                <span className="auto-date-value">
-                  <Calendar size={15} color="#2563eb" />
-                  {formatDisplayDate(autoEndDate)}
-                </span>
-                <span className="auto-badge">{durationMonths} {durationMonths === 1 ? 'Month (30d)' : 'Months'}</span>
-              </div>
-              <div className="duration-selector-row">
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Duration:</span>
+              <input
+                id="end-date"
+                type="date"
+                className="form-input"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setIsCustomEndDate(true);
+                }}
+                required
+              />
+              <div className="quick-date-chips">
                 <button
                   type="button"
-                  className={`duration-pill-btn ${durationMonths === 1 ? 'active' : ''}`}
-                  onClick={() => setDurationMonths(1)}
+                  className={`date-chip ${endDate === getLastDayOfMonthISO(startDate) ? 'active' : ''}`}
+                  onClick={() => handleSetEndDatePreset('month_end')}
+                  title="Ends on the last day of the month"
                 >
-                  1 Mo (30d)
+                  Last Day of Month
                 </button>
                 <button
                   type="button"
-                  className={`duration-pill-btn ${durationMonths === 2 ? 'active' : ''}`}
-                  onClick={() => setDurationMonths(2)}
+                  className={`date-chip ${!isCustomEndDate && durationMonths === 1 ? 'active' : ''}`}
+                  onClick={() => handleSetEndDatePreset('1_month')}
                 >
-                  2 Mo (60d)
+                  1 Mo
                 </button>
                 <button
                   type="button"
-                  className={`duration-pill-btn ${durationMonths === 3 ? 'active' : ''}`}
-                  onClick={() => setDurationMonths(3)}
+                  className={`date-chip ${!isCustomEndDate && durationMonths === 2 ? 'active' : ''}`}
+                  onClick={() => handleSetEndDatePreset('2_months')}
                 >
-                  3 Mo (90d)
+                  2 Mo
+                </button>
+                <button
+                  type="button"
+                  className={`date-chip ${!isCustomEndDate && durationMonths === 3 ? 'active' : ''}`}
+                  onClick={() => handleSetEndDatePreset('3_months')}
+                >
+                  3 Mo
                 </button>
               </div>
             </div>
@@ -799,9 +887,9 @@ export default function App() {
               <span>Enrollment Period:</span>
               <strong>{formatDisplayDate(startDate)}</strong>
               <ArrowRight size={13} />
-              <strong>{formatDisplayDate(autoEndDate)}</strong>
+              <strong>{formatDisplayDate(effectiveFormEndDate)}</strong>
               <span style={{ color: '#2563eb', fontWeight: '600' }}>
-                ({durationMonths * 30} Days — {currency}{effectiveMonthlyFee}/month)
+                ({getDaysCount(startDate, effectiveFormEndDate, true)} Days — {currency}{effectiveMonthlyFee}/month)
               </span>
             </div>
 
@@ -926,7 +1014,7 @@ export default function App() {
                   </thead>
                   <tbody>
                     {filteredStudents.map((student) => {
-                      const days = getDaysCount(student.startDate, student.endDate);
+                      const days = getDaysCount(student.startDate, student.endDate, true);
                       const initials = student.name
                         .split(' ')
                         .map((n) => n[0])
@@ -1145,7 +1233,7 @@ export default function App() {
               {/* Mobile Cards View (Visible on mobile phones <= 768px) */}
               <div className="mobile-cards-view">
                 {filteredStudents.map((student) => {
-                  const days = getDaysCount(student.startDate, student.endDate);
+                  const days = getDaysCount(student.startDate, student.endDate, true);
                   const initials = student.name
                     .split(' ')
                     .map((n) => n[0])
@@ -1374,6 +1462,14 @@ export default function App() {
                   <span className="receipt-label">Monthly Fee Rate:</span>
                   <span className="receipt-value">{currency}{receiptData.monthlyFee} / month</span>
                 </div>
+                {receiptData.startDate && receiptData.endDate && (
+                  <div className="receipt-row">
+                    <span className="receipt-label">Covered Fee Period:</span>
+                    <span className="receipt-value" style={{ fontWeight: '600' }}>
+                      {formatDisplayDate(receiptData.startDate)} ➔ {formatDisplayDate(receiptData.endDate)}
+                    </span>
+                  </div>
+                )}
                 <div className="receipt-row">
                   <span className="receipt-label">Payment Date & Time:</span>
                   <span className="receipt-value">{receiptData.paidAt || 'Recorded'}</span>

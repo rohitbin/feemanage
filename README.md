@@ -5,7 +5,7 @@ A modern, responsive React web application designed for tutors, coaching institu
 ## Features
 
 - **Quick Student Enrollment**: Enroll students by entering just their name (press `Enter ↵` to quickly add multiple students).
-- **Exact 30-Day Billing Cycles**: Automatically calculates 30-day, 60-day (2 mo), or 90-day (3 mo) periods from the start date.
+- **Intelligent Fee Billing Cycles**: Automatically calculates fee periods ending on the last day of the month or cycle (e.g., 1st to 30th/31st, or 25th to 24th), ensuring the ending date is always the last day, not the starting day of the next cycle. Includes 1-click presets for "Last Day of Month" (e.g., 31st Oct, 30th Nov) and editable ending date picker.
 - **Accrued Multi-Month Dues Detection**:
   - Automatically compares enrollment ending dates with the current date/month.
   - Identifies students who have not submitted fees for 1 month, 2 months, 3+ months.
